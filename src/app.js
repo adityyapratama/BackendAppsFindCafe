@@ -48,13 +48,12 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
 
-const startServer = async () => {
-  await connectDatabase();
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+if (require.main === module) {
+  connectDatabase().then(() => {
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
   });
-};
-
-startServer();
+}
 
 module.exports = app;
