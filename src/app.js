@@ -20,10 +20,17 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 500, // Longgarkan untuk API umum
   message: 'Too many requests from this IP, please try again later.',
 });
 app.use('/api/', limiter);
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 50, // Batasan lebih ketat untuk Auth
+  message: 'Too many authentication attempts from this IP, please try again later.',
+});
+app.use('/api/auth/', authLimiter);
 
 app.use(logger);
 

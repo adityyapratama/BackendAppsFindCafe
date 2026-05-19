@@ -20,3 +20,4 @@ router.use('/reviews', reviewRoutes);
 router.use('/admin', adminRoutes);
 
 module.exports = router;
+    

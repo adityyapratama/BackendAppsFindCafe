@@ -44,36 +44,40 @@ const createReview = async (req, res, next) => {
     const status = approvalMode === 'auto' ? 'approved' : 'pending';
     const approvedVia = approvalMode === 'auto' ? 'auto' : null;
 
-    const review = await prisma.review.create({
-      data: {
-        placeId: BigInt(id),
-        userId: BigInt(req.user.id),
-        rating,
-        comment,
-        status,
-        approvedVia,
-      },
+    const review = await prisma.$transaction(async (tx) => {
+      const newReview = await tx.review.create({
+        data: {
+          placeId: BigInt(id),
+          userId: BigInt(req.user.id),
+          rating,
+          comment,
+          status,
+          approvedVia,
+        },
+      });
+
+      if (status === 'approved') {
+        const aggregations = await tx.review.aggregate({
+          _avg: { rating: true },
+          _count: { rating: true },
+          where: { placeId: BigInt(id), status: 'approved' },
+        });
+
+        await tx.place.update({
+          where: { id: BigInt(id) },
+          data: {
+            ratingCount: aggregations._count.rating,
+            avgRating: aggregations._avg.rating || 0,
+          },
+        });
+      }
+      return newReview;
     });
-
-    if (status === 'approved') {
-      const place = await prisma.place.findUnique({
-        where: { id: BigInt(id) },
-        select: { ratingCount: true, avgRating: true },
-      });
-
-      const newRatingCount = place.ratingCount + 1;
-      const newAvgRating = (parseFloat(place.avgRating) * place.ratingCount + rating) / newRatingCount;
-
-      await prisma.place.update({
-        where: { id: BigInt(id) },
-        data: { ratingCount: newRatingCount, avgRating: newAvgRating },
-      });
-    }
 
     return successResponse(res, review, 'Review submitted', 201);
   } catch (error) {
     if (error.code === 'P2002') {
-      return errorResponse(res, 'You have already reviewed this place');
+      return errorResponse(res, 'You have already reviewed this place', null, 409);
     }
     next(error);
   }
@@ -84,18 +88,40 @@ const updateReview = async (req, res, next) => {
     const { id } = req.params;
     const { rating, comment } = req.body;
 
-    const review = await prisma.review.findUnique({ where: { id: BigInt(id) } });
-    if (!review || review.userId !== BigInt(req.user.id)) {
-      return errorResponse(res, 'Review not found', null, 404);
-    }
+    const updated = await prisma.$transaction(async (tx) => {
+      const review = await tx.review.findUnique({ where: { id: BigInt(id) } });
+      if (!review || review.userId !== BigInt(req.user.id)) {
+        throw new Error('Review_Not_Found');
+      }
 
-    const updated = await prisma.review.update({
-      where: { id: BigInt(id) },
-      data: { rating, comment },
+      const updatedReview = await tx.review.update({
+        where: { id: BigInt(id) },
+        data: { rating, comment },
+      });
+
+      if (updatedReview.status === 'approved') {
+        const aggregations = await tx.review.aggregate({
+          _avg: { rating: true },
+          _count: { rating: true },
+          where: { placeId: review.placeId, status: 'approved' },
+        });
+
+        await tx.place.update({
+          where: { id: review.placeId },
+          data: {
+            ratingCount: aggregations._count.rating,
+            avgRating: aggregations._avg.rating || 0,
+          },
+        });
+      }
+      return updatedReview;
     });
 
     return successResponse(res, updated, 'Review updated');
   } catch (error) {
+    if (error.message === 'Review_Not_Found') {
+      return errorResponse(res, 'Review not found or access denied', null, 404);
+    }
     next(error);
   }
 };
@@ -104,38 +130,36 @@ const deleteReview = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const review = await prisma.review.findUnique({ where: { id: BigInt(id) } });
-    if (!review || review.userId !== BigInt(req.user.id)) {
-      return errorResponse(res, 'Review not found', null, 404);
-    }
+    await prisma.$transaction(async (tx) => {
+      const review = await tx.review.findUnique({ where: { id: BigInt(id) } });
+      if (!review || review.userId !== BigInt(req.user.id)) {
+        throw new Error('Review_Not_Found');
+      }
 
-    await prisma.review.delete({ where: { id: BigInt(id) } });
+      await tx.review.delete({ where: { id: BigInt(id) } });
 
-    if (review.status === 'approved') {
-      const place = await prisma.place.findUnique({
-        where: { id: review.placeId },
-        select: { ratingCount: true, avgRating: true },
-      });
-
-      if (place.ratingCount > 1) {
-        const newRatingCount = place.ratingCount - 1;
-        const newAvgRating =
-          (parseFloat(place.avgRating) * place.ratingCount - review.rating) / newRatingCount;
-
-        await prisma.place.update({
-          where: { id: review.placeId },
-          data: { ratingCount: newRatingCount, avgRating: newAvgRating },
+      if (review.status === 'approved') {
+        const aggregations = await tx.review.aggregate({
+          _avg: { rating: true },
+          _count: { rating: true },
+          where: { placeId: review.placeId, status: 'approved' },
         });
-      } else {
-        await prisma.place.update({
+
+        await tx.place.update({
           where: { id: review.placeId },
-          data: { ratingCount: 0, avgRating: 0 },
+          data: {
+            ratingCount: aggregations._count.rating,
+            avgRating: aggregations._avg.rating || 0,
+          },
         });
       }
-    }
+    });
 
     return successResponse(res, null, 'Review deleted');
   } catch (error) {
+    if (error.message === 'Review_Not_Found') {
+      return errorResponse(res, 'Review not found or access denied', null, 404);
+    }
     next(error);
   }
 };
