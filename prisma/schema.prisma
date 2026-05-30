@@ -33,6 +33,7 @@ model User {
   resolvedReports      Report[]             @relation("ResolvedReports")
   moderationLogs       ModerationLog[]
   updatedSettings      AppSettings[]        @relation("UpdatedBy")
+  refreshTokens        RefreshToken[]
 
   @@map("users")
 }
@@ -136,6 +137,12 @@ model Place {
   editRequests   PlaceEditRequest[]
   reports        Report[]
 
+  @@index([status, categoryId])
+  @@index([status, district])
+  @@index([status, createdAt])
+  @@index([latitude, longitude])
+  @@index([status, avgRating])
+  @@index([status, recommendationCount])
   @@map("places")
 }
 
@@ -190,6 +197,7 @@ model PlacePhoto {
   uploader   User? @relation("UploadedPhotos", fields: [uploadedBy], references: [id], onDelete: SetNull)
   approver   User? @relation("ApprovedPhotos", fields: [approvedBy], references: [id], onDelete: SetNull)
 
+  @@index([placeId, status])
   @@map("place_photos")
 }
 
@@ -212,6 +220,7 @@ model Review {
   approver User? @relation("ApprovedReviews", fields: [approvedBy], references: [id], onDelete: SetNull)
 
   @@unique([placeId, userId])
+  @@index([placeId, status])
   @@map("reviews")
 }
 
@@ -273,6 +282,7 @@ model Report {
   reporter User  @relation(fields: [reportedBy], references: [id], onDelete: Cascade)
   resolver User? @relation("ResolvedReports", fields: [resolvedBy], references: [id], onDelete: SetNull)
 
+  @@index([status, createdAt])
   @@map("reports")
 }
 
@@ -289,5 +299,21 @@ model ModerationLog {
 
   admin User? @relation(fields: [adminId], references: [id], onDelete: SetNull)
 
+  @@index([targetType, targetId])
+  @@index([createdAt])
   @@map("moderation_logs")
+}
+
+model RefreshToken {
+  id        BigInt    @id @default(autoincrement())
+  userId    BigInt    @map("user_id")
+  token     String    @unique @db.Text
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
 }

@@ -82,6 +82,12 @@ async function main() {
   });
   console.log('Admin user seeded');
 
+  // Clean up expired refresh tokens
+  await prisma.refreshToken.deleteMany({
+    where: { expiresAt: { lt: new Date() } },
+  });
+  console.log('Expired refresh tokens cleaned');
+
   console.log('Seeding completed!');
 }
 
