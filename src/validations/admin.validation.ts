@@ -32,6 +32,7 @@ const category = Joi.object({
 const tag = Joi.object({
   name: Joi.string().min(2).max(50).required(),
   slug: Joi.string().min(2).max(50).required(),
+  type: Joi.string().min(2).max(20).required(),
   icon: Joi.string().allow('', null),
   isActive: Joi.boolean().default(true),
 });
@@ -58,7 +59,7 @@ const updatePlace = Joi.object({
   instagramUrl: Joi.string().uri().allow('', null),
   googleMapsUrl: Joi.string().uri().allow('', null),
   status: Joi.string().valid('pending', 'approved', 'rejected', 'archived'),
-  isActive: Joi.boolean(),
+  isPermanentlyClosed: Joi.boolean(),
 }).min(1);
 
 export { updateSettings, reject, resolveReport, editRequestAction, category, tag, registerAdmin, updatePlace };

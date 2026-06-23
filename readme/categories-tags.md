@@ -49,7 +49,7 @@ Mengambil seluruh fasilitas/tag yang berstatus `isActive: true`.
       "name": "string (Contoh: WiFi Cepat)",
       "slug": "string (Contoh: wifi-cepat)",
       "icon": "string | null (Contoh: fas fa-wifi)",
-      "type": "string | null",
+      "type": "string (mis: 'facility', wajib diisi saat dibuat — lihat readme/admin.md)",
       "isActive": "boolean"
     }
   ]

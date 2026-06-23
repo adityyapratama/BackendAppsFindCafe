@@ -75,3 +75,21 @@ describe('Rate Limiting', () => {
     expect(res.headers).toHaveProperty('x-ratelimit-limit');
   });
 });
+
+describe('Malformed numeric ID handling', () => {
+  it('GET /places/:id with a non-numeric id returns 400, not 500', async () => {
+    const res = await request(app).get('/api/v1/places/not-a-number');
+    expect(res.statusCode).toBe(400);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('GET /places?category_id=<non-numeric> returns 400, not 500', async () => {
+    const res = await request(app).get('/api/v1/places?category_id=abc');
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('GET /places?tag_ids=<non-numeric> returns 400, not 500', async () => {
+    const res = await request(app).get('/api/v1/places?tag_ids=abc,2');
+    expect(res.statusCode).toBe(400);
+  });
+});

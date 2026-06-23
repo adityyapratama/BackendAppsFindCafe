@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import multer from 'multer';
 import { AppError } from '../errors';
 import { logger } from './logger';
 
@@ -8,6 +9,23 @@ const errorHandler = (err, req, res, next) => {
       success: false,
       message: err.message,
       errors: err.errors,
+    });
+  }
+
+  if (err instanceof multer.MulterError) {
+    const message = err.code === 'LIMIT_FILE_SIZE' ? 'File too large. Maximum size is 5MB.' : err.message;
+    return res.status(400).json({
+      success: false,
+      message,
+      errors: null,
+    });
+  }
+
+  if (err instanceof SyntaxError && /Cannot convert .* to a BigInt/.test(err.message)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid ID format',
+      errors: null,
     });
   }
 

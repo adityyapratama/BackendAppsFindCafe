@@ -12,13 +12,17 @@ Mendapatkan daftar kafe dengan *pagination*, filter, dan fitur pencarian. Hanya 
 ### Query Parameters
 | Param | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `search` | `string` | No | `""` | Pencarian berdasarkan nama/alamat |
+| `search` | `string` | No | - | Pencarian pada nama, alamat, dan deskripsi (case-insensitive) |
 | `page` | `number` | No | `1` | Halaman data |
 | `limit` | `number` | No | `10` | Jumlah data per halaman |
-| `sort` | `string` | No | `rating`| Opsi: `rating` atau `latest` |
-| `order` | `string` | No | `desc` | Opsi: `asc` atau `desc` |
-| `category` | `number` | No | - | Filter by ID kategori |
-| `district` | `string` | No | - | Filter by Kecamatan (teks) |
+| `sort` | `string` | No | terbaru (`createdAt desc`) | Opsi: `rating` (avgRating desc) atau `recommended` (recommendationCount desc) |
+| `category_id` | `number` | No | - | Filter by ID kategori |
+| `district` | `string` | No | - | Filter by Kecamatan (teks, exact match) |
+| `min_rating` | `number` | No | - | Filter `avgRating >=` nilai ini |
+| `price_min` | `number` | No | - | Filter `priceMin >=` nilai ini |
+| `price_max` | `number` | No | - | Filter `priceMax <=` nilai ini |
+| `tag_ids` | `string` | No | - | Daftar ID tag dipisah koma (mis. `1,2,3`), tempat harus punya minimal salah satu |
+| `lat`, `lng`, `radius_km` | `number` | No | - | Jika ketiganya diisi, mengaktifkan pencarian radius (formula Haversine) dan diurutkan berdasarkan jarak terdekat secara default; mengabaikan `sort` kecuali `rating`/`recommended` |
 
 ### Response (200 OK)
 ```json
@@ -36,13 +40,11 @@ Mendapatkan daftar kafe dengan *pagination*, filter, dan fitur pencarian. Hanya 
       "avgRating": "number (0.0 to 5.0)",
       "recommendationCount": "number",
       "status": "string ('approved')",
-      "category": { "name": "string" },
-      "photos": [
-        {
-          "id": "number",
-          "url": "string (URL)"
-        }
-      ]
+      "category": { "name": "string", "slug": "string", "icon": "string | null" },
+      "placeTags": [
+        { "tag": { "name": "string", "slug": "string", "type": "string" } }
+      ],
+      "distance": "number (km, hanya muncul jika query lat/lng/radius_km dipakai)"
     }
   ],
   "meta": {
@@ -72,7 +74,7 @@ Mendapatkan detail komprehensif dari sebuah kafe.
   "data": {
     "id": "number",
     "categoryId": "number",
-    "submitterId": "number",
+    "submittedBy": "number | null",
     "name": "string",
     "description": "string | null",
     "address": "string",
@@ -115,24 +117,16 @@ Mendapatkan detail komprehensif dari sebuah kafe.
     "photos": [
       {
         "id": "number",
-        "url": "string"
-      }
-    ],
-    "reviews": [
-      {
-        "id": "number",
-        "rating": "number (1-5)",
-        "content": "string",
-        "createdAt": "string (ISO Date)",
-        "user": {
-          "name": "string",
-          "avatarUrl": "string | null"
-        }
+        "photoUrl": "string",
+        "caption": "string | null",
+        "isCover": "boolean"
       }
     ]
   }
 }
 ```
+
+Catatan: `photos` hanya menyertakan foto dengan `status: 'approved'` (maks. 10). Review **tidak** disertakan di sini — gunakan endpoint terpisah `GET /places/:id/reviews` (lihat bagian 7). Response detail ini di-*cache* selama 5 menit (`PLACE_DETAIL` TTL).
 
 ---
 
@@ -159,17 +153,164 @@ Mengajukan tempat baru. Secara default akan masuk ke sistem dengan status `pendi
 | `websiteUrl` | `string` | No | Valid URI format | URL Web |
 | `instagramUrl`| `string` | No | Valid URI format | URL IG |
 | `googleMapsUrl`| `string` | No | Valid URI format | URL Gmaps |
-| `tags` | `[number]` | No | Array of Tag IDs | Fasilitas (opsional) |
+
+Catatan: endpoint ini **belum** mendukung pengisian tag/fasilitas (`tags`) saat submit — field tersebut akan diabaikan jika dikirim. Tag baru bisa dikaitkan ke tempat lewat sisi admin/database secara langsung untuk saat ini.
 
 ### Response (201 Created)
 ```json
 {
   "success": true,
-  "message": "Place created successfully",
+  "message": "Place submitted successfully",
   "data": {
     "id": "number",
     "name": "string",
     "status": "pending"
+  }
+}
+```
+
+Catatan: jika `AppSettings.placeApprovalMode` diset ke `auto`, tempat langsung berstatus `approved` (tidak menunggu admin).
+
+---
+
+## 4. Upload Foto Tempat
+Mengunggah foto untuk sebuah tempat. File diunggah ke Cloudinary di server (bukan upload langsung dari client ke Cloudinary).
+
+- **URL**: `/api/v1/places/:id/photos`
+- **Method**: `POST`
+- **Auth Required**: Yes (`Authorization: Bearer <access_token>`)
+- **Content-Type**: `multipart/form-data`
+
+### Form Fields
+| Field | Type | Required | Constraints | Description |
+|-------|------|----------|-------------|-------------|
+| `photo` | `file` | Yes | JPEG/PNG/WebP, max 5MB | File gambar |
+| `caption` | `string` | No | Max 150 chars | Keterangan foto |
+| `isCover` | `string` | No | `"true"` / `"false"` | Jadikan foto sampul |
+
+### Response (201 Created)
+```json
+{
+  "success": true,
+  "message": "Photo uploaded successfully",
+  "data": {
+    "id": "number",
+    "placeId": "number",
+    "photoUrl": "string (Cloudinary secure URL)",
+    "storagePath": "string (Cloudinary public_id)",
+    "caption": "string | null",
+    "isCover": "boolean",
+    "status": "string ('pending' atau 'approved', tergantung photoApprovalMode)"
+  }
+}
+```
+
+### Response (400 Bad Request)
+Dikembalikan jika tipe file bukan JPEG/PNG/WebP (`"Only JPEG, PNG, and WebP images are allowed"`) atau ukuran file melebihi 5MB (`"File too large. Maximum size is 5MB."`).
+
+---
+
+## 5. Ajukan Perubahan Data (Edit Request)
+Mengajukan usulan perubahan data tempat yang sudah ada. Tidak langsung mengubah data — menunggu persetujuan admin (lihat `readme/admin.md`).
+
+- **URL**: `/api/v1/places/:id/edit-requests`
+- **Method**: `POST`
+- **Auth Required**: Yes (`Authorization: Bearer <access_token>`)
+
+### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `proposedData` | `object` | Yes | Minimal 1 field. Field yang didukung: `name`, `description`, `address`, `district`, `latitude`, `longitude`, `categoryId`, `priceMin`, `priceMax`, `phone`, `websiteUrl`, `instagramUrl`, `googleMapsUrl` |
+
+**Contoh Payload**:
+```json
+{
+  "proposedData": {
+    "phone": "081234567890",
+    "priceMin": 15000
+  }
+}
+```
+
+### Response (201 Created)
+```json
+{
+  "success": true,
+  "message": "Edit request submitted",
+  "data": {
+    "id": "number",
+    "placeId": "number",
+    "submittedBy": "number",
+    "proposedData": "object",
+    "status": "pending"
+  }
+}
+```
+
+---
+
+## 6. Laporkan Tempat (Report)
+Melaporkan tempat karena alasan tertentu (lokasi salah, sudah tutup, duplikat, dll). Menambah `reportCount` pada tempat tersebut.
+
+- **URL**: `/api/v1/places/:id/reports`
+- **Method**: `POST`
+- **Auth Required**: Yes (`Authorization: Bearer <access_token>`)
+
+### Request Body
+| Field | Type | Required | Constraints | Description |
+|-------|------|----------|-------------|-------------|
+| `reasonType` | `string` | Yes | Salah satu dari: `wrong_location`, `closed`, `duplicate`, `inappropriate`, `wrong_information`, `other` | Jenis alasan laporan |
+| `description` | `string` | No | - | Keterangan tambahan |
+
+### Response (201 Created)
+```json
+{
+  "success": true,
+  "message": "Report submitted",
+  "data": {
+    "id": "number",
+    "placeId": "number",
+    "reportedBy": "number",
+    "reasonType": "string",
+    "description": "string | null",
+    "status": "open"
+  }
+}
+```
+
+---
+
+## 7. Get Reviews untuk Tempat
+Mendapatkan daftar review (yang sudah `approved`) untuk sebuah tempat, dengan *pagination*. Lihat `readme/reviews-favorites.md` untuk endpoint create/update/delete review.
+
+- **URL**: `/api/v1/places/:id/reviews`
+- **Method**: `GET`
+- **Auth Required**: No
+
+### Query Parameters
+| Param | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `page` | `number` | No | `1` | Halaman data |
+| `limit` | `number` | No | `10` | Jumlah data per halaman |
+
+### Response (200 OK)
+```json
+{
+  "success": true,
+  "message": "Reviews retrieved",
+  "data": [
+    {
+      "id": "number",
+      "rating": "number (1-5)",
+      "comment": "string | null",
+      "createdAt": "string (ISO Date)",
+      "user": { "id": "number", "name": "string", "avatarUrl": "string | null" }
+    }
+  ],
+  "meta": {
+    "total": "number",
+    "page": "number",
+    "limit": "number"
   }
 }
 ```

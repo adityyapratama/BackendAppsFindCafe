@@ -11,7 +11,15 @@ const auth = (req, res, next) => {
       });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded: any = jwt.verify(token, process.env.JWT_SECRET);
+
+    if (decoded.type === 'refresh') {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid or expired token',
+      });
+    }
+
     req.user = decoded;
     next();
   } catch (error) {
