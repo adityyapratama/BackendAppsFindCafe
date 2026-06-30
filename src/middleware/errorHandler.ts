@@ -1,9 +1,12 @@
+import * as Sentry from '@sentry/node';
 import { Prisma } from '@prisma/client';
 import multer from 'multer';
 import { AppError } from '../errors';
 import { logger } from './logger';
 
 const errorHandler = (err, req, res, next) => {
+  Sentry.captureException(err);
+
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
       success: false,

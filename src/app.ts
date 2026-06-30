@@ -1,4 +1,16 @@
 require('dotenv').config();
+import * as Sentry from '@sentry/node';
+
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  environment: process.env.NODE_ENV || 'development',
+  tracesSampleRate: process.env.NODE_ENV === 'development' ? 1.0 : 0.1,
+  sendDefaultPii: true,
+  integrations: [
+    Sentry.prismaIntegration(),
+  ],
+});
+
 import { validateEnv } from './config/env';
 validateEnv();
 require('./utils/bigIntToJson');
@@ -78,6 +90,7 @@ app.use((req, res) => {
 });
 
 app.use(errorHandler);
+Sentry.setupExpressErrorHandler(app);
 
 const PORT = process.env.PORT || 3000;
 
@@ -91,6 +104,7 @@ if (require.main === module) {
       logger.info(`${signal} received, shutting down gracefully`);
       server.close(async () => {
         await prisma.$disconnect();
+        await Sentry.flush(2000);
         logger.info('Server closed');
         process.exit(0);
       });
