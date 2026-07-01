@@ -41,7 +41,7 @@ const register = async ({ name, email, password, phone }) => {
     data: { userId: user.id, token: refreshToken, expiresAt: refreshTokenExpiresAt() },
   });
 
-  return { ...user, token, refreshToken };
+  return { ...user, reviewsCount: 0, visitedCount: 0, token, refreshToken };
 };
 
 const login = async ({ email, password }) => {
@@ -68,7 +68,8 @@ const login = async ({ email, password }) => {
     data: { userId: user.id, token: refreshToken, expiresAt: refreshTokenExpiresAt() },
   });
 
-  return { token, refreshToken, user: { id: user.id, name: user.name, email: user.email, role: user.role } };
+  const reviewsCount = await prisma.review.count({ where: { userId: user.id, status: 'approved' } });
+  return { token, refreshToken, user: { id: user.id, name: user.name, email: user.email, role: user.role, reviewsCount, visitedCount: 0 } };
 };
 
 const refresh = async (refreshToken) => {
@@ -109,16 +110,19 @@ const logout = async (refreshToken) => {
 };
 
 const getProfile = async (userId) => {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, name: true, email: true, role: true, phone: true, avatarUrl: true, isActive: true, createdAt: true },
-  });
+  const [user, reviewsCount] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, email: true, role: true, phone: true, avatarUrl: true, isActive: true, createdAt: true },
+    }),
+    prisma.review.count({ where: { userId, status: 'approved' } }),
+  ]);
   if (!user) {
     const error = new Error('User not found');
     error.statusCode = 404;
     throw error;
   }
-  return user;
+  return { ...user, reviewsCount, visitedCount: 0 };
 };
 
 const updateProfile = async (userId, data) => {

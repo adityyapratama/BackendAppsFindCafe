@@ -128,23 +128,37 @@ const getPlaceById = async (id) => {
   const cached = cacheService.get(cacheKey);
   if (cached) return cached;
 
-  const place = await prisma.place.findFirst({
-    where: { id: BigInt(id as any | number), status: 'approved' },
-    include: {
-      category: { select: { name: true, slug: true, icon: true } },
-      placeTags: { include: { tag: { select: { name: true, slug: true, type: true } } } },
-      openingHours: true,
-      photos: { where: { status: 'approved' }, take: 10 },
-    },
-  });
+  const [place, reviewStats] = await Promise.all([
+    prisma.place.findFirst({
+      where: { id: BigInt(id as any | number), status: 'approved' },
+      include: {
+        category: { select: { name: true, slug: true, icon: true } },
+        placeTags: { include: { tag: { select: { name: true, slug: true, type: true } } } },
+        openingHours: true,
+        photos: { where: { status: 'approved' }, take: 10 },
+      },
+    }),
+    prisma.review.groupBy({
+      by: ['rating'],
+      where: { placeId: BigInt(id as any | number), status: 'approved' },
+      _count: { rating: true },
+    }),
+  ]);
+
   if (!place) {
     const error = new Error('Place not found');
     error.statusCode = 404;
     throw error;
   }
 
-  cacheService.set(cacheKey, place, cacheService.TTL.PLACE_DETAIL);
-  return place;
+  const ratingDistribution: Record<string, number> = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 };
+  for (const r of reviewStats) {
+    ratingDistribution[String(r.rating)] = r._count.rating;
+  }
+
+  const result = { ...place, reviewCount: place.ratingCount, ratingDistribution };
+  cacheService.set(cacheKey, result, cacheService.TTL.PLACE_DETAIL);
+  return result;
 };
 
 const createPlace = async (data, userId) => {

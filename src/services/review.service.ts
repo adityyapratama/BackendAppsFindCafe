@@ -1,4 +1,5 @@
 import prisma from '../config/prisma';
+import * as cacheService from './cache.service';
 
 const getReviews = async (placeId, { page = 1, limit = 10 }) => {
   const where: any = { placeId: BigInt(placeId as any | number), status: 'approved' };
@@ -89,6 +90,7 @@ const recalculateRating = async (placeId) => {
     where: { id: placeId },
     data: { avgRating: stats._avg.rating || 0, ratingCount: stats._count },
   });
+  cacheService.del(cacheService.KEYS.PLACE_DETAIL(placeId));
 };
 
 export { getReviews, createReview, updateReview, deleteReview, recalculateRating };
