@@ -15,7 +15,10 @@
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:studio": "prisma studio",
-    "seed": "node prisma/seed.js"
+    "seed": "node prisma/seed.js",
+    "seed:places": "node prisma/seed-places.js",
+    "extract:places": "python3 prisma/extract-places.py",
+    "geocode:places": "node prisma/geocode-places.js"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^6.3.1",
