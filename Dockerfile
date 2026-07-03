@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
@@ -15,4 +15,4 @@ RUN npx tsc && npm prune --omit=dev
 EXPOSE 3000
 
 # ponytail: db push at start so build never needs a live DB; external postgres supplies DATABASE_URL
-CMD ["sh", "-c", "npx prisma db push --skip-generate && node dist/app.js"]
+CMD ["sh", "-c", "npx prisma db push && node dist/app.js"]
