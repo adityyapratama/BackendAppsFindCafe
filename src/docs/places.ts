@@ -81,10 +81,43 @@
 
 /**
  * @swagger
+ * /places/mine:
+ *   get:
+ *     tags: [Places]
+ *     summary: List the authenticated user's own submitted places (any status)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema: { type: string, enum: [pending, approved, rejected, archived] }
+ *         description: Optional filter by submission status
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 10 }
+ *     responses:
+ *       200:
+ *         description: User's submissions with pagination meta. All ids are serialized as numeric strings.
+ *       401:
+ *         description: Missing or invalid token
+ */
+
+/**
+ * @swagger
  * /places:
  *   post:
  *     tags: [Places]
  *     summary: Submit new place
+ *     description: >
+ *       Accepts application/json or multipart/form-data. With multipart you may
+ *       attach an optional `photo` file which becomes the cover image (P1).
+ *       latitude/longitude are optional when `googleMapsUrl` contains
+ *       coordinates the server can parse (P5). The response `data` also carries
+ *       a `possibleDuplicates` array of nearby existing places (P4, non-blocking).
+ *       Note: every id in the response is serialized as a numeric string (P2).
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -93,14 +126,14 @@
  *         application/json:
  *           schema:
  *             type: object
- *             required: [name, address, latitude, longitude, categoryId]
+ *             required: [name, address, categoryId]
  *             properties:
  *               name: { type: string, maxLength: 150 }
  *               description: { type: string }
  *               address: { type: string }
  *               district: { type: string }
- *               latitude: { type: number, minimum: -90, maximum: 90 }
- *               longitude: { type: number, minimum: -180, maximum: 180 }
+ *               latitude: { type: number, minimum: -90, maximum: 90, description: "Optional if googleMapsUrl has coordinates" }
+ *               longitude: { type: number, minimum: -180, maximum: 180, description: "Optional if googleMapsUrl has coordinates" }
  *               categoryId: { type: integer }
  *               priceMin: { type: integer }
  *               priceMax: { type: integer }
@@ -108,9 +141,32 @@
  *               websiteUrl: { type: string, format: uri }
  *               instagramUrl: { type: string, format: uri }
  *               googleMapsUrl: { type: string, format: uri }
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [name, address, categoryId]
+ *             properties:
+ *               name: { type: string, maxLength: 150 }
+ *               description: { type: string }
+ *               address: { type: string }
+ *               district: { type: string }
+ *               latitude: { type: number }
+ *               longitude: { type: number }
+ *               categoryId: { type: integer }
+ *               priceMin: { type: integer }
+ *               priceMax: { type: integer }
+ *               phone: { type: string }
+ *               websiteUrl: { type: string, format: uri }
+ *               instagramUrl: { type: string, format: uri }
+ *               googleMapsUrl: { type: string, format: uri }
+ *               photo:
+ *                 type: string
+ *                 format: binary
+ *                 description: Optional cover photo (JPEG/PNG/WebP, max 5MB)
+ *               caption: { type: string, maxLength: 150 }
  *     responses:
  *       201:
- *         description: Place submitted (pending approval)
+ *         description: Place submitted (pending approval). data includes possibleDuplicates[].
  */
 
 /**

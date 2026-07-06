@@ -1,4 +1,8 @@
 import prisma from '../config/prisma';
+import { parseGoogleMapsUrl, distanceMeters } from '../utils/geo';
+
+// P4: two submissions closer than this (metres) are flagged as possible dupes.
+const DUPLICATE_RADIUS_M = 200;
 
 const generateUniqueSlug = async (name) => {
   const baseSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -163,22 +167,81 @@ const getPlaceById = async (id) => {
   return result;
 };
 
+// P5: resolve coordinates, falling back to the Google Maps URL when the
+// client did not provide an explicit lat/lng (e.g. user pasted a share link).
+const resolveCoordinates = (data) => {
+  const hasLat = data.latitude !== undefined && data.latitude !== null;
+  const hasLng = data.longitude !== undefined && data.longitude !== null;
+  if (hasLat && hasLng) {
+    return { latitude: Number(data.latitude), longitude: Number(data.longitude) };
+  }
+
+  const fromUrl = parseGoogleMapsUrl(data.googleMapsUrl);
+  if (fromUrl) return fromUrl;
+
+  const error: any = new Error('Validation failed');
+  error.statusCode = 400;
+  error.errors = {
+    latitude: [
+      'latitude & longitude wajib diisi, atau sertakan googleMapsUrl yang memuat koordinat',
+    ],
+  };
+  throw error;
+};
+
+// P4: find already-submitted places within DUPLICATE_RADIUS_M of the given
+// coordinates. Non-blocking — returned as a warning, never rejects the create.
+const findPossibleDuplicates = async (latitude: number, longitude: number) => {
+  // ~0.002 deg ≈ 220m at Surabaya's latitude; a cheap bounding box prefilter
+  // before the exact Haversine check.
+  const delta = 0.002;
+  const candidates = await prisma.place.findMany({
+    where: {
+      status: { in: ['pending', 'approved'] },
+      latitude: { gte: latitude - delta, lte: latitude + delta },
+      longitude: { gte: longitude - delta, lte: longitude + delta },
+    },
+    select: { id: true, name: true, latitude: true, longitude: true, status: true },
+    take: 20,
+  });
+
+  return candidates
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      status: c.status,
+      distanceMeters: Math.round(
+        distanceMeters(
+          { latitude, longitude },
+          { latitude: Number(c.latitude), longitude: Number(c.longitude) }
+        )
+      ),
+    }))
+    .filter((c) => c.distanceMeters <= DUPLICATE_RADIUS_M)
+    .sort((a, b) => a.distanceMeters - b.distanceMeters)
+    .slice(0, 5);
+};
+
 const createPlace = async (data, userId) => {
+  const { latitude, longitude } = resolveCoordinates(data);
+
   const settings = await prisma.appSettings.findFirst();
   const approvalMode = settings?.placeApprovalMode || 'manual';
   const status = approvalMode === 'auto' ? 'approved' : 'pending';
   const approvedVia = approvalMode === 'auto' ? 'auto' : null;
   const slug = await generateUniqueSlug(data.name);
 
-  return prisma.place.create({
+  const possibleDuplicates = await findPossibleDuplicates(latitude, longitude);
+
+  const place = await prisma.place.create({
     data: {
       name: data.name,
       slug,
       description: data.description,
       address: data.address,
       district: data.district,
-      latitude: data.latitude,
-      longitude: data.longitude,
+      latitude,
+      longitude,
       categoryId: BigInt(data.categoryId),
       priceMin: data.priceMin,
       priceMax: data.priceMax,
@@ -191,7 +254,41 @@ const createPlace = async (data, userId) => {
       approvedVia,
     },
   });
+
+  // Spread the place fields at the top level so existing clients keep reading
+  // data.id/data.status unchanged; the warning rides alongside.
+  return { ...place, possibleDuplicates };
 };
+
+// P3: list the authenticated user's own submissions across every status.
+const getMyPlaces = async (userId, query) => {
+  const page = parseInt((query?.page as any) || '1');
+  const limit = parseInt((query?.limit as any) || '10');
+  const skip = (page - 1) * limit;
+
+  const where: any = { submittedBy: BigInt(userId as any | number) };
+  if (query?.status) where.status = query.status;
+
+  const [places, total] = await Promise.all([
+    prisma.place.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { submittedAt: 'desc' },
+      include: { category: { select: { name: true, slug: true, icon: true } } },
+    }),
+    prisma.place.count({ where }),
+  ]);
+
+  return { places, total, page, limit, totalPages: Math.ceil(total / limit) };
+};
+
+// P1: persist a place's cover photo URL after a cover image is uploaded.
+const setCoverPhotoUrl = (placeId, photoUrl: string) =>
+  prisma.place.update({
+    where: { id: BigInt(placeId as any | number) },
+    data: { coverPhotoUrl: photoUrl },
+  });
 
 import { uploadToCloudinary } from '../config/cloudinary';
 
@@ -240,4 +337,4 @@ const createReport = async (placeId, userId, { reasonType, description }) => {
   return report;
 };
 
-export { getPlaces, getPlaceById, createPlace, uploadPhoto, createEditRequest, createReport };
+export { getPlaces, getPlaceById, createPlace, getMyPlaces, setCoverPhotoUrl, uploadPhoto, createEditRequest, createReport };
