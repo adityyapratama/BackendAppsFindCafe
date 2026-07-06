@@ -22,7 +22,7 @@ const createCategory = async (data) => {
 
 const updateCategory = async (id, data) => {
   const category = await prisma.category.update({
-    where: { id: parseInt(id, 10) },
+    where: { id: BigInt(id) },
     data,
   });
   cacheService.del(cacheService.KEYS.CATEGORIES);
@@ -31,7 +31,7 @@ const updateCategory = async (id, data) => {
 
 const deleteCategory = async (id) => {
   await prisma.category.delete({
-    where: { id: parseInt(id, 10) },
+    where: { id: BigInt(id) },
   });
   cacheService.del(cacheService.KEYS.CATEGORIES);
 };

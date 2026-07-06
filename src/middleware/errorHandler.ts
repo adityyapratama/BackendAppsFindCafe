@@ -51,6 +51,23 @@ const errorHandler = (err, req, res, next) => {
     if (err.code === 'P2025') {
       return res.status(404).json({ success: false, message: 'Record not found' });
     }
+    if (err.code === 'P2003') {
+      return res.status(409).json({
+        success: false,
+        message: 'Conflict: Record is still referenced by other data',
+        errors: null,
+      });
+    }
+  }
+
+  // Prisma driver adapter (pg) leaks FK/restrict violations as DriverAdapterError
+  // instead of P2003; cause.code is a Postgres SQLSTATE (23503 = foreign key, 23001 = restrict)
+  if (err.name === 'DriverAdapterError' && ['23503', '23001'].includes(err.cause?.code)) {
+    return res.status(409).json({
+      success: false,
+      message: 'Conflict: Record is still referenced by other data',
+      errors: null,
+    });
   }
 
   logger.error({ err, method: req.method, url: req.originalUrl }, 'Unhandled error');

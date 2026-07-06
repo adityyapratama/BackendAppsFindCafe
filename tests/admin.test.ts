@@ -5,6 +5,7 @@ import {
   uniqueSuffix,
   createAdminDirect,
   createUserDirect,
+  createApprovedPlaceDirect,
   deleteUserCascade,
   deletePlaceCascade,
 } from './helpers';
@@ -126,6 +127,48 @@ describe('Admin API', () => {
       expect(res.body.data.name).toBe(`Test Category Updated ${suffix}`);
     });
 
+    it('PUT /admin/categories/:id allows a partial update', async () => {
+      const res = await request(app)
+        .put(`/api/v1/admin/categories/${categoryId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ sortOrder: 42 });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.data.sortOrder).toBe(42);
+    });
+
+    it('PUT /admin/categories/:id rejects an empty body', async () => {
+      const res = await request(app)
+        .put(`/api/v1/admin/categories/${categoryId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({});
+
+      expect(res.statusCode).toBe(400);
+    });
+
+    it('PUT /admin/categories/:id returns 400 for a non-numeric id', async () => {
+      const res = await request(app)
+        .put('/api/v1/admin/categories/abc')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ sortOrder: 1 });
+
+      expect(res.statusCode).toBe(400);
+    });
+
+    it('DELETE /admin/categories/:id returns 409 when the category is still used by a place', async () => {
+      const place = await createApprovedPlaceDirect({ categoryId: BigInt(categoryId) });
+      createdPlaceIds.push(place.id.toString());
+
+      const res = await request(app)
+        .delete(`/api/v1/admin/categories/${categoryId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      // clean up before asserting so a failure doesn't leave the category referenced
+      await deletePlaceCascade(place.id);
+
+      expect(res.statusCode).toBe(409);
+    });
+
     it('DELETE /admin/categories/:id removes the category', async () => {
       const res = await request(app)
         .delete(`/api/v1/admin/categories/${categoryId}`)
@@ -165,6 +208,25 @@ describe('Admin API', () => {
         .send({ name: `Test Tag Updated ${suffix}`, slug, type: 'facility' });
 
       expect(res.statusCode).toBe(200);
+    });
+
+    it('PUT /admin/tags/:id allows a partial update', async () => {
+      const res = await request(app)
+        .put(`/api/v1/admin/tags/${tagId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ isActive: false });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.data.isActive).toBe(false);
+    });
+
+    it('PUT /admin/tags/:id rejects an empty body', async () => {
+      const res = await request(app)
+        .put(`/api/v1/admin/tags/${tagId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({});
+
+      expect(res.statusCode).toBe(400);
     });
 
     it('DELETE /admin/tags/:id removes the tag', async () => {

@@ -29,6 +29,14 @@ const category = Joi.object({
   isActive: Joi.boolean().default(true),
 });
 
+const updateCategory = Joi.object({
+  name: Joi.string().min(2).max(50),
+  slug: Joi.string().min(2).max(50),
+  icon: Joi.string().allow('', null),
+  sortOrder: Joi.number().integer(),
+  isActive: Joi.boolean(),
+}).min(1);
+
 const tag = Joi.object({
   name: Joi.string().min(2).max(50).required(),
   slug: Joi.string().min(2).max(50).required(),
@@ -36,6 +44,14 @@ const tag = Joi.object({
   icon: Joi.string().allow('', null),
   isActive: Joi.boolean().default(true),
 });
+
+const updateTag = Joi.object({
+  name: Joi.string().min(2).max(50),
+  slug: Joi.string().min(2).max(50),
+  type: Joi.string().min(2).max(20),
+  icon: Joi.string().allow('', null),
+  isActive: Joi.boolean(),
+}).min(1);
 
 const registerAdmin = Joi.object({
   name: Joi.string().min(2).max(100).required(),
@@ -62,4 +78,4 @@ const updatePlace = Joi.object({
   isPermanentlyClosed: Joi.boolean(),
 }).min(1);
 
-export { updateSettings, reject, resolveReport, editRequestAction, category, tag, registerAdmin, updatePlace };
+export { updateSettings, reject, resolveReport, editRequestAction, category, updateCategory, tag, updateTag, registerAdmin, updatePlace };

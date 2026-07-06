@@ -41,11 +41,11 @@ import * as tagController from '../controllers/tag.controller';
 router.post('/users', validate(adminValidation.registerAdmin), adminController.createAdminUser);
 
 router.post('/categories', validate(adminValidation.category), categoryController.createCategory);
-router.put('/categories/:id', validate(adminValidation.category), categoryController.updateCategory);
+router.put('/categories/:id', validate(adminValidation.updateCategory), categoryController.updateCategory);
 router.delete('/categories/:id', categoryController.deleteCategory);
 
 router.post('/tags', validate(adminValidation.tag), tagController.createTag);
-router.put('/tags/:id', validate(adminValidation.tag), tagController.updateTag);
+router.put('/tags/:id', validate(adminValidation.updateTag), tagController.updateTag);
 router.delete('/tags/:id', tagController.deleteTag);
 
 router.put('/places/:id', validate(adminValidation.updatePlace), adminController.updatePlace);

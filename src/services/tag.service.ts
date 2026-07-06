@@ -21,7 +21,7 @@ const createTag = async (data) => {
 
 const updateTag = async (id, data) => {
   const tag = await prisma.tag.update({
-    where: { id: parseInt(id, 10) },
+    where: { id: BigInt(id) },
     data,
   });
   cacheService.invalidatePattern(cacheService.KEYS.TAGS);
@@ -30,7 +30,7 @@ const updateTag = async (id, data) => {
 
 const deleteTag = async (id) => {
   await prisma.tag.delete({
-    where: { id: parseInt(id, 10) },
+    where: { id: BigInt(id) },
   });
   cacheService.invalidatePattern(cacheService.KEYS.TAGS);
 };
