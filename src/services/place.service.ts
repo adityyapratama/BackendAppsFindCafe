@@ -95,18 +95,20 @@ const getPlacesWithDistance = async (query, skip, take) => {
   if (sort === 'rating') orderClause = 'ORDER BY p.avg_rating DESC';
   if (sort === 'recommended') orderClause = 'ORDER BY p.recommendation_count DESC';
 
+  const distanceExpr = `(6371 * acos(cos(radians($1)) * cos(radians(p.latitude)) * cos(radians(p.longitude) - radians($2)) + sin(radians($1)) * sin(radians(p.latitude))))`;
+
   const countQuery = `
     SELECT COUNT(*) as total FROM places p
     ${whereClause}
-    AND (6371 * acos(cos(radians($1)) * cos(radians(p.latitude)) * cos(radians(p.longitude) - radians($2)) + sin(radians($1)) * sin(radians(p.latitude)))) <= $3
+    AND ${distanceExpr} <= $3
   `;
 
   const dataQuery = `
     SELECT p.*,
-      (6371 * acos(cos(radians($1)) * cos(radians(p.latitude)) * cos(radians(p.longitude) - radians($2)) + sin(radians($1)) * sin(radians(p.latitude)))) AS distance
+      ${distanceExpr} AS distance
     FROM places p
     ${whereClause}
-    HAVING (6371 * acos(cos(radians($1)) * cos(radians(p.latitude)) * cos(radians(p.longitude) - radians($2)) + sin(radians($1)) * sin(radians(p.latitude)))) <= $3
+    AND ${distanceExpr} <= $3
     ${orderClause}
     LIMIT ${take} OFFSET ${skip}
   `;

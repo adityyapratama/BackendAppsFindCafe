@@ -9,6 +9,17 @@ describe('Places API', () => {
     expect(res.body.data).toBeInstanceOf(Array);
   });
 
+  it('GET /api/v1/places with geo radius filter should return 200', async () => {
+    const res = await request(app).get('/api/v1/places?lat=-7.2575&lng=112.7521&radius_km=5&limit=3');
+    expect(res.statusCode).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toBeInstanceOf(Array);
+    // every returned row carries a computed distance within the radius
+    for (const p of res.body.data) {
+      expect(Number(p.distance)).toBeLessThanOrEqual(5);
+    }
+  });
+
   it('GET /api/v1/places/:id should return 404 for invalid id', async () => {
     const res = await request(app).get('/api/v1/places/999999999');
     expect(res.statusCode).toBe(404);

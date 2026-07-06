@@ -117,6 +117,15 @@ describe('Admin API', () => {
       categoryId = res.body.data.id;
     });
 
+    it('GET /admin/categories lists the category', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/categories')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.data.some((c: any) => c.id === categoryId)).toBe(true);
+    });
+
     it('PUT /admin/categories/:id updates the category', async () => {
       const res = await request(app)
         .put(`/api/v1/admin/categories/${categoryId}`)
@@ -131,10 +140,22 @@ describe('Admin API', () => {
       const res = await request(app)
         .put(`/api/v1/admin/categories/${categoryId}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ sortOrder: 42 });
+        .send({ sortOrder: 42, isActive: false });
 
       expect(res.statusCode).toBe(200);
       expect(res.body.data.sortOrder).toBe(42);
+      expect(res.body.data.isActive).toBe(false);
+    });
+
+    it('GET /admin/categories still shows an inactive category (unlike the public endpoint)', async () => {
+      const [adminRes, publicRes] = await Promise.all([
+        request(app).get('/api/v1/admin/categories').set('Authorization', `Bearer ${adminToken}`),
+        request(app).get('/api/v1/categories'),
+      ]);
+
+      expect(adminRes.statusCode).toBe(200);
+      expect(adminRes.body.data.some((c: any) => c.id === categoryId)).toBe(true);
+      expect(publicRes.body.data.some((c: any) => c.id === categoryId)).toBe(false);
     });
 
     it('PUT /admin/categories/:id rejects an empty body', async () => {
@@ -190,6 +211,15 @@ describe('Admin API', () => {
 
       expect(res.statusCode).toBe(201);
       tagId = res.body.data.id;
+    });
+
+    it('GET /admin/tags lists the tag', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/tags')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.data.some((t: any) => t.id === tagId)).toBe(true);
     });
 
     it('POST /admin/tags rejects a missing type', async () => {
@@ -416,6 +446,26 @@ describe('Admin API', () => {
 
       expect(res.statusCode).toBe(200);
       expect(res.body.data.status).toBe('resolved');
+    });
+
+    it('PATCH /admin/reports/:id/resolve accepts status dismissed (stored as rejected)', async () => {
+      const report = await prisma.report.create({
+        data: {
+          placeId: BigInt(placeId),
+          reportedBy: BigInt(regularUserId),
+          reasonType: 'other',
+          description: 'e2e dismiss test',
+        },
+      });
+
+      const res = await request(app)
+        .patch(`/api/v1/admin/reports/${report.id}/resolve`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'dismissed', resolutionNote: 'not valid' });
+
+      expect(res.statusCode).toBe(200);
+      // DB check constraint only allows open/reviewed/resolved/rejected
+      expect(res.body.data.status).toBe('rejected');
     });
   });
 

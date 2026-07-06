@@ -8,6 +8,13 @@ const getCategories = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
+const getAllCategories = async (req, res, next) => {
+  try {
+    const categories = await categoryService.getAllCategories();
+    return successResponse(res, categories, 'Categories retrieved');
+  } catch (error) { next(error); }
+};
+
 const createCategory = async (req, res, next) => {
   try {
     const category = await categoryService.createCategory(req.body);
@@ -29,4 +36,4 @@ const deleteCategory = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
-export { getCategories, createCategory, updateCategory, deleteCategory };
+export { getCategories, getAllCategories, createCategory, updateCategory, deleteCategory };

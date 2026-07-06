@@ -8,6 +8,13 @@ const getTags = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
+const getAllTags = async (req, res, next) => {
+  try {
+    const tags = await tagService.getAllTags(req.query.type);
+    return successResponse(res, tags, 'Tags retrieved');
+  } catch (error) { next(error); }
+};
+
 const createTag = async (req, res, next) => {
   try {
     const tag = await tagService.createTag(req.body);
@@ -29,4 +36,4 @@ const deleteTag = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
-export { getTags, createTag, updateTag, deleteTag };
+export { getTags, getAllTags, createTag, updateTag, deleteTag };

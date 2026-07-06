@@ -14,6 +14,10 @@ const getCategories = async () => {
   return categories;
 };
 
+const getAllCategories = async () => {
+  return prisma.category.findMany({ orderBy: { sortOrder: 'asc' } });
+};
+
 const createCategory = async (data) => {
   const category = await prisma.category.create({ data });
   cacheService.del(cacheService.KEYS.CATEGORIES);
@@ -36,4 +40,4 @@ const deleteCategory = async (id) => {
   cacheService.del(cacheService.KEYS.CATEGORIES);
 };
 
-export { getCategories, createCategory, updateCategory, deleteCategory };
+export { getCategories, getAllCategories, createCategory, updateCategory, deleteCategory };

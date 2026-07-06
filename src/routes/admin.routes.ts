@@ -40,10 +40,12 @@ import * as tagController from '../controllers/tag.controller';
 
 router.post('/users', validate(adminValidation.registerAdmin), adminController.createAdminUser);
 
+router.get('/categories', categoryController.getAllCategories);
 router.post('/categories', validate(adminValidation.category), categoryController.createCategory);
 router.put('/categories/:id', validate(adminValidation.updateCategory), categoryController.updateCategory);
 router.delete('/categories/:id', categoryController.deleteCategory);
 
+router.get('/tags', tagController.getAllTags);
 router.post('/tags', validate(adminValidation.tag), tagController.createTag);
 router.put('/tags/:id', validate(adminValidation.updateTag), tagController.updateTag);
 router.delete('/tags/:id', tagController.deleteTag);

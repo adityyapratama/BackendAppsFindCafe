@@ -14,7 +14,7 @@ const reject = Joi.object({
 
 const resolveReport = Joi.object({
   resolutionNote: Joi.string().allow('', null),
-  status: Joi.string().valid('resolved', 'dismissed').default('resolved'),
+  status: Joi.string().valid('resolved', 'dismissed', 'rejected').default('resolved'),
 });
 
 const editRequestAction = Joi.object({

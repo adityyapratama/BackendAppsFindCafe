@@ -83,7 +83,14 @@ Mengembalikan objek settings terbaru. Setiap update otomatis tercatat di `Modera
 
 ## 3. Manage Master Data (Categories & Tags)
 
-### 3.1 Create Category
+Endpoint publik `GET /categories` dan `GET /tags` (lihat `readme/categories-tags.md`) hanya menampilkan data dengan `isActive: true` dan hasilnya di-*cache* 1 jam. Gunakan endpoint *admin* di bawah untuk melihat **seluruh** data (termasuk yang `isActive: false`) tanpa *cache*, misalnya untuk menampilkan daftar kelola di dashboard admin.
+
+### 3.1 Get All Categories (Admin)
+- **URL**: `/api/v1/admin/categories`
+- **Method**: `GET`
+- **Response**: Array seluruh Category (aktif maupun nonaktif), urut `sortOrder` ASC. Tidak ada *pagination*.
+
+### 3.2 Create Category
 Membuat data kategori utama baru.
 
 - **URL**: `/api/v1/admin/categories`
@@ -107,17 +114,37 @@ Membuat data kategori utama baru.
 }
 ```
 
-### 3.2 Update Category
+### 3.3 Update Category
 - **URL**: `/api/v1/admin/categories/:id`
 - **Method**: `PUT`
-- *(Payload identik dengan Create Category, semua field optional)*
+- Semua field opsional (sama seperti Create Category), namun **minimal 1 field** harus dikirim — body kosong `{}` akan ditolak dengan `400`. Cocok untuk *partial update*, mis. hanya mengirim `{ "isActive": false }` untuk menyembunyikan kategori tanpa menyentuh field lain.
 
-### 3.3 Delete Category
+### 3.4 Delete Category
 - **URL**: `/api/v1/admin/categories/:id`
 - **Method**: `DELETE`
 - *(Hanya menghapus kategori, tidak memerlukan Payload)*
+- **409 Conflict**: Ditolak jika kategori masih dipakai oleh satu atau lebih Place (`onDelete: Restrict` di database). Nonaktifkan (`isActive: false`) lewat *Update Category* sebagai alternatif hard-delete.
 
-*(CATATAN: Pola yang identik digunakan untuk Tags, dengan base URL `/api/v1/admin/tags`. Request Body Tags tidak punya `sortOrder`, tapi punya field tambahan wajib `type` (string, mis: `"facility"`) untuk pengelompokan/filter — lihat `GET /tags?type=...` di `readme/categories-tags.md`).*
+### 3.5 Get All Tags (Admin)
+- **URL**: `/api/v1/admin/tags`
+- **Method**: `GET`
+- **Query Params**: `type` (string, opsional) — filter berdasarkan kolom `type`.
+- **Response**: Array seluruh Tag (aktif maupun nonaktif), urut `name` ASC. Tidak ada *pagination*.
+
+### 3.6 Create Tag
+- **URL**: `/api/v1/admin/tags`
+- **Method**: `POST`
+- *(Payload sama dengan Create Category, tapi tidak ada `sortOrder`; ada field tambahan wajib `type` (string, mis: `"facility"`) untuk pengelompokan/filter — lihat `GET /tags?type=...` di `readme/categories-tags.md`)*
+
+### 3.7 Update Tag
+- **URL**: `/api/v1/admin/tags/:id`
+- **Method**: `PUT`
+- Semua field opsional, minimal 1 field harus dikirim (sama seperti *Update Category* di 3.3).
+
+### 3.8 Delete Tag
+- **URL**: `/api/v1/admin/tags/:id`
+- **Method**: `DELETE`
+- Tidak ada batasan referensial — relasi ke Place (`PlaceTag`) memakai `onDelete: Cascade`, sehingga tag yang masih dipakai tetap bisa dihapus (baris `place_tags` terkait ikut terhapus).
 
 ---
 
@@ -212,7 +239,7 @@ Laporan yang dikirim user lewat `POST /places/:id/reports` (lihat `readme/places
 ### 6.1 Get Reports
 - **URL**: `/api/v1/admin/reports`
 - **Method**: `GET`
-- **Query Params**: `status` (`open` / `resolved` / `dismissed`), `page`, `limit`
+- **Query Params**: `status` (`open` / `reviewed` / `resolved` / `rejected`), `page`, `limit`
 - **Response**: Array Report Objects dengan relasi `place` (`id`, `name`) dan `reporter` (`id`, `name`), plus `meta` (`total`, `page`, `limit`).
 
 ### 6.2 Resolve / Dismiss Report
@@ -222,8 +249,10 @@ Laporan yang dikirim user lewat `POST /places/:id/reports` (lihat `readme/places
 #### Request Body
 | Field | Type | Required | Constraints | Description |
 |-------|------|----------|-------------|-------------|
-| `status` | `string` | No | `resolved` (default) / `dismissed` | Hasil tinjauan |
+| `status` | `string` | No | `resolved` (default) / `dismissed` / `rejected` | Hasil tinjauan |
 | `resolutionNote` | `string` | No | - | Catatan penyelesaian |
+
+> **Catatan**: kolom `status` di database hanya mengizinkan `open` / `reviewed` / `resolved` / `rejected`. Nilai `dismissed` tetap diterima demi kompatibilitas klien, tapi disimpan sebagai `rejected` — jadi filter `GET /admin/reports?status=dismissed` tidak akan menemukan apa pun; gunakan `status=rejected`.
 
 ---
 

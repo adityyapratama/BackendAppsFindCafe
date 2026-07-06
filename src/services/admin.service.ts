@@ -117,9 +117,11 @@ const getReports = async ({ status, page = 1, limit = 10 }) => {
 };
 
 const resolveReport = async (id, adminId, { resolutionNote, status = 'resolved' }) => {
+  // DB check constraint allows open/reviewed/resolved/rejected; map the API's 'dismissed' to 'rejected'
+  const dbStatus = status === 'dismissed' ? 'rejected' : status;
   const report = await prisma.report.update({
     where: { id: BigInt(id as any | number) },
-    data: { status, resolutionNote, resolvedBy: BigInt(adminId as any | number), resolvedAt: new Date() },
+    data: { status: dbStatus, resolutionNote, resolvedBy: BigInt(adminId as any | number), resolvedAt: new Date() },
   });
   await logModeration(adminId, 'report', id, 'resolve_report', resolutionNote);
   return report;

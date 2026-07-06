@@ -1,6 +1,8 @@
 # Categories & Tags API
 
-Panduan endpoint untuk mengambil data referensi / master data yang dikonfigurasi oleh Admin. Semua *response* pada modul ini di-*cache* (TTL 1 Jam) menggunakan NodeCache.
+Panduan endpoint untuk mengambil data referensi / master data yang dikonfigurasi oleh Admin. Semua *response* pada modul ini di-*cache* (TTL 1 Jam) menggunakan NodeCache, dan hanya menampilkan data `isActive: true`.
+
+> Untuk membuat/mengubah/menghapus kategori & tag (termasuk melihat yang `isActive: false`), lihat *endpoint* admin (`/api/v1/admin/categories`, `/api/v1/admin/tags`) di `readme/admin.md`.
 
 ## 1. Get All Categories
 Mengambil seluruh kategori yang berstatus `isActive: true` dengan pengurutan berdasarkan kolom `sortOrder` (ASC).

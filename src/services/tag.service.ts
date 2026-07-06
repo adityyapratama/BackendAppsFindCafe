@@ -13,6 +13,11 @@ const getTags = async (type) => {
   return tags;
 };
 
+const getAllTags = async (type) => {
+  const where = type ? { type } : {};
+  return prisma.tag.findMany({ where, orderBy: { name: 'asc' } });
+};
+
 const createTag = async (data) => {
   const tag = await prisma.tag.create({ data });
   cacheService.invalidatePattern(cacheService.KEYS.TAGS); // Flush all tag caches
@@ -35,4 +40,4 @@ const deleteTag = async (id) => {
   cacheService.invalidatePattern(cacheService.KEYS.TAGS);
 };
 
-export { getTags, createTag, updateTag, deleteTag };
+export { getTags, getAllTags, createTag, updateTag, deleteTag };

@@ -7,6 +7,11 @@ cloudinary.config({
 });
 
 const uploadToCloudinary = (buffer: any, options: any = {}) => {
+  if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+    const error: any = new Error('Photo upload is not available: Cloudinary credentials are not configured on this server');
+    error.statusCode = 503;
+    return Promise.reject(error);
+  }
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       { folder: 'cafe-surabaya', resource_type: 'image', ...options },
